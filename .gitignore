@@ -1,0 +1,11 @@
+# Byte-compiled
+__pycache__/
+*.py[cod]
+
+# vscode files
+.vscode/
+
+# PDA PA3 files
+*.block
+*.nets
+*.rpt
