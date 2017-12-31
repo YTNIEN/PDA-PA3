@@ -15,7 +15,7 @@ import argparse
 from collections import namedtuple
 
 START_TIME = time.time()
-Terminal = namedtuple('Terminal', ['x', 'y'])
+Terminal = namedtuple('Terminal', ['name', 'x', 'y'])
 
 class Block:
     '''Hard circuit block, say macro, to place in floorplan.
@@ -47,6 +47,9 @@ class Block:
         '''
         self.is_rotated = True if not self.is_rotated else False
 
+    def __repr__(self):
+        return "Block(name='{0.name}', width={0._width}, height={0._height})".format(self)
+
 class Net:
     '''Interconnect between blocks and terminals.
     '''
@@ -68,26 +71,66 @@ class Floorplan:
     def __init__(self):
         '''
         '''
+        self.w_limit = -1
+        self.h_limit = -1
+        self.blocks = []
+        self.name_to_block = {}
+        self.terminals = []
+        self.name_to_terminal = {}
+
+    def parse_block_file(self, block_file):
+        '''Parse input block file.
+        '''
+        try:
+            with open(block_file, 'rt') as f:
+                self.w_limit, self.h_limit = f.readline().split()[1:]
+                nblock = int(f.readline().split()[1])
+                nterminal = int(f.readline().split()[1])
+                for line in f:
+                    if not line.strip():
+                        continue
+                    strs = line.split()
+                    if strs[1] == 'terminal':
+                        terminal = Terminal(name=strs[0], x=int(strs[2]), y=int(strs[3]))
+                        self.terminals.append(terminal)
+                        self.name_to_block[terminal.name] = terminal
+                    else:
+                        block = Block(name=strs[0], width=int(strs[1]), height=int(strs[2]))
+                        self.blocks.append(block)
+                        self.name_to_block[block.name] = block
+                assert len(self.blocks) == nblock, 'Wrong block number'
+                assert len(self.terminals) == nterminal, 'Wrong terminal number'
+        except OSError as err:
+            print(err, file=sys.stderr)
+
+    def parse_net_file(self, net_file):
+        '''Parse input net files.
+        '''
         pass
 
 def parse_cmd_line(argv):
     '''Parse the argumets in command line.
     '''
     parser = argparse.ArgumentParser(description='PDA PA3 - Fixed Outline Floorplanning')
-    parser.add_argument('alpha', metavar='<alpha>', type=float,
+    parser.add_argument('alpha', metavar='<alpha α>', type=float,
                         help=('User defined ratio to balance chip area and wire length'))
     parser.add_argument('block_file', metavar='<input_block>', help='Input.block name')
     parser.add_argument('net_file', metavar='<input_net>', help='Input.net name')
     parser.add_argument('output_file', metavar='<output>', help='output name')
     args = parser.parse_args(argv)
-    print(type(args.alpha))
     return args
 
 def main(argv):
     '''Main function.
     '''
     print('PDA PA3 - Fixed Outline Floorplanning')
-    parse_cmd_line(argv)
+    args = parse_cmd_line(argv)
+    fpr = Floorplan()
+    # parse block
+    fpr.parse_block_file(args.block_file)
+    # parse net
+    # sequence pair
+    # - longest path by modified BFS
 
 if __name__ == '__main__':
     main(sys.argv[1:])
