@@ -77,6 +77,7 @@ class Floorplan:
         self.name_to_block = {}
         self.terminals = []
         self.name_to_terminal = {}
+        self.nets = []
 
     def parse_block_file(self, block_file):
         '''Parse input block file.
@@ -106,7 +107,38 @@ class Floorplan:
     def parse_net_file(self, net_file):
         '''Parse input net files.
         '''
-        pass
+        try:
+            with open(net_file, 'rt') as f:
+                # read first line for NumNets
+                nnet = int(f.readline().split()[1]) # net count
+                for line in f:
+                    # skip blank line, say line with '\n' only
+                    if not line.strip():
+                        continue
+                    line = line.split()
+                    if line[0] == 'NetDegree:':
+                        terminal_cnt = int(line[1])
+                        terminals = []
+                        for _ in range(terminal_cnt):
+                            term_name = f.readline().strip()
+                            print(term_name)
+                            if term_name in self.name_to_block:
+                                terminals.append(self.name_to_block[term_name])
+                            elif term_name in self.name_to_terminal:
+                                terminals.append(self.name_to_terminal[term_name])
+                            else:
+                                print('Error: found terminal/block not specified in block file',
+                                      file=sys.stderr)
+                                sys.exit()
+                        net = Net(terminals)
+                        self.nets.append(net)
+                    else:
+                        print('Error: in parsing net file', file=sys.stderr)
+                        sys.exit()
+                assert nnet == len(self.nets), 'Net number not equivalent'
+
+        except OSError as err:
+            print(err, file=sys.stderr)
 
 def parse_cmd_line(argv):
     '''Parse the argumets in command line.
@@ -125,10 +157,11 @@ def main(argv):
     '''
     print('PDA PA3 - Fixed Outline Floorplanning')
     args = parse_cmd_line(argv)
-    fpr = Floorplan()
+    flpr = Floorplan()
     # parse block
-    fpr.parse_block_file(args.block_file)
+    flpr.parse_block_file(args.block_file)
     # parse net
+    flpr.parse_net_file(args.net_file)
     # sequence pair
     # - longest path by modified BFS
 
