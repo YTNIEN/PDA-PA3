@@ -8,15 +8,16 @@ optimizing total area overhead and net wirelength.
 '''
 # pylint: disable=R0902, R0903
 
+import argparse
+import copy
+import math
 import sys
 import time
-import argparse
-# import tkinter as tk
 from collections import namedtuple
 from itertools import combinations
+from random import randint, random, sample
 
 import graph
-
 
 START_TIME = time.time()
 Terminal = namedtuple('Terminal', ['name', 'x', 'y'])
@@ -49,6 +50,7 @@ class Block:
     def rotate(self):
         '''Rotate this block.
         '''
+        self.is_rotated = True if not self.is_rotated else False
         self._width, self._height = self._height, self._width
 
     def __repr__(self):
@@ -89,12 +91,77 @@ class Floorplan:
     def place_block(self):
         '''Do floorplanning via simulated-annealing.
         '''
-        # initial sequence pair
+        # initial solution
         self.seq_pair = (list(range(len(self.blocks))), list(range(len(self.blocks))))
         # self.seq_pair = ([0,6,3,4,1,5,2,7], [7,3,6,1,4,2,5,0])
         print(self.seq_pair)
-        # construct HCG, VCG
-        self._construct_cgraph()
+
+        # TODO: tune annealing parameter
+        best_sol = copy.deepcopy(self.seq_pair) # Best
+        temp = 1000.0 # T
+        move_cnt = 0 # MT
+        uphill = 0 # uphill
+        uphill_lim = 200 * len(self.blocks) # N
+        reject_cnt = 0 # reject
+        cool_ratio = 0.95
+
+        width, height = self._calc_area_cost()
+        wire_len = self._calc_wire_cost()
+        cost = self._calc_cost(width*height, wire_len)
+        best_cost = cost
+        print('Init cost: {:,}'.format(cost))
+        input()
+
+        # while reject ratio in previous round was not so high and time is not up
+        while True:
+            move_cnt = 0
+            uphill = 0
+            reject_cnt = 0
+            while True:
+                move = randint(0, 0)
+                # print('cur move: {}'.format(move))
+                if move == 0:
+                    # swap posive sequence only
+                    idxes = sample(range(len(self.blocks)), 2)
+                    # print(idxes)
+                    old_seq_pair = copy.deepcopy(self.seq_pair)
+                    (self.seq_pair[0][idxes[0]], self.seq_pair[0][idxes[1]]) = (self.seq_pair[0][idxes[1]], self.seq_pair[0][idxes[0]])
+                elif move == 1:
+                    pass
+                else:
+                    # FIXME: block rotation needs the configuration of rotation of each block
+                    pass
+                new_width, new_height = self._calc_area_cost()
+                new_wire_len = self._calc_wire_cost()
+
+                new_cost = self._calc_cost(new_width * new_height, new_wire_len)
+                delta_cost = new_cost - cost
+                move_cnt += 1
+
+                if delta_cost < 0.0 or random() < math.exp(-1*delta_cost/temp):
+                    # print('Delta cost: {}'.format(delta_cost), flush=True)
+                    cost = new_cost
+                    if delta_cost > 0:
+                        uphill += 1
+                    if new_cost < best_cost:
+                        best_sol = copy.deepcopy(self.seq_pair)
+                        best_cost = new_cost
+                else:
+                    # restore sequence pair
+                    self.seq_pair = old_seq_pair
+                    reject_cnt += 1
+
+                if uphill > uphill_lim or move_cnt > 2*uphill_lim:
+                    break
+            temp = cool_ratio * temp
+            # FIXME: add termination condition in terms of T
+            if (reject_cnt/move_cnt) > 0.95 or (time.time() - START_TIME) >= 50.0:
+                if reject_cnt/move_cnt > 0.95:
+                    print('SA ends due to tons of rejection', flush=True)
+                else:
+                    print('SA ends at time-up', flush=True)
+                break
+        print('Best cost: {:,}'.format(best_cost))
 
     def parse_block_file(self, block_file):
         '''Parse input block file.
@@ -119,7 +186,7 @@ class Floorplan:
                 assert len(self.blocks) == nblock, 'Wrong block number'
                 assert len(self.terminals) == nterminal, 'Wrong terminal number'
         except OSError as err:
-            print(err, file=sys.stderr)
+            sys.exit(err)
 
     def parse_net_file(self, net_file):
         '''Parse input net files.
@@ -154,17 +221,23 @@ class Floorplan:
                 assert nnet == len(self.nets), 'Net number not equivalent'
 
         except OSError as err:
-            print(err, file=sys.stderr)
+            sys.exit(err)
 
-    def _calc_cost(self):
+    def _calc_cost(self, area, wire_len):
+        '''Calculate final cost considering both area and wire length.
+        '''
+        return self.alpha * area + (1 - self.alpha) * wire_len
+
+    def _calc_wire_cost(self):
         '''Calculate cost in terms of area and wire length.
         '''
-        # area: longest path
         # wire length: HPWL of each net
-        pass
+        # TODO: add wire cost implementation
+        return 0
 
-    def _construct_cgraph(self):
-        '''Construct constraint graph, HCG and VCG.
+    def _calc_area_cost(self):
+        '''Construct constraint graph, HCG and VCG based on sequence pair and return width and
+        height of floorplan.
         '''
         hcg = graph.Hcg(self.blocks) # horizontal constraint graph
         vcg = graph.Vcg(self.blocks) # vertical constraint graph
@@ -189,9 +262,10 @@ class Floorplan:
         hcg.connect_to_st()
         vcg.connect_to_st()
         # modified BFS to find longest path
-        print(hcg.get_target_weight())
-        print(vcg.get_target_weight())
-        input()
+        # the accumulated weight at target in VCG and HCG is the size of floorplan
+        weight = hcg.get_target_weight()
+        height = vcg.get_target_weight()
+        return weight, height
 
 def parse_cmd_line(argv):
     '''Parse the argumets in command line.

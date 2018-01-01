@@ -135,7 +135,7 @@ class Hcg(Dag):
         for node in self.nodes:
             node.block.left_x = node.weight - node.block.get_width()
             node.block.right_x = node.weight
-            print('{}: {} to {}'.format(node.block.name, node.block.left_x, node.block.right_x))
+            # print('{}: {} to {}'.format(node.block.name, node.block.left_x, node.block.right_x))
 
 class Vcg(Dag):
     '''Horizontal constraint graph.
@@ -179,7 +179,7 @@ class Vcg(Dag):
         for node in self.nodes:
             node.block.bottom_y = node.weight - node.block.get_height()
             node.block.top_y = node.weight
-            print('{}: {} to {}'.format(node.block.name, node.block.bottom_y, node.block.top_y))
+            # print('{}: {} to {}'.format(node.block.name, node.block.bottom_y, node.block.top_y))
 
 class Node:
     '''Node.
