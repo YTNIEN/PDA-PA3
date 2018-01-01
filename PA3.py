@@ -34,7 +34,7 @@ class Block:
         self.left_x = -1
         self.bottom_y = -1
         self.right_x = -1
-        self.up_y = -1
+        self.top_y = -1
 
     def get_width(self):
         '''Get width.
@@ -90,8 +90,8 @@ class Floorplan:
         '''Do floorplanning via simulated-annealing.
         '''
         # initial sequence pair
-        #self.seq_pair = (list(range(len(self.blocks))), list(range(len(self.blocks))))
-        self.seq_pair = ([0,6,3,4,1,5,2,7], [7,3,6,1,4,2,5,0])
+        self.seq_pair = (list(range(len(self.blocks))), list(range(len(self.blocks))))
+        # self.seq_pair = ([0,6,3,4,1,5,2,7], [7,3,6,1,4,2,5,0])
         print(self.seq_pair)
         # construct HCG, VCG
         self._construct_cgraph()
@@ -166,8 +166,8 @@ class Floorplan:
     def _construct_cgraph(self):
         '''Construct constraint graph, HCG and VCG.
         '''
-        hcg = graph.Dag(self.blocks) # horizontal constraint graph
-        vcg = graph.Dag(self.blocks) # vertical constraint graph
+        hcg = graph.Hcg(self.blocks) # horizontal constraint graph
+        vcg = graph.Vcg(self.blocks) # vertical constraint graph
         for pair in combinations(self.seq_pair[0], 2):
             # print(pair)
             if self.seq_pair[1].index(pair[0]) < self.seq_pair[1].index(pair[1]):
@@ -188,6 +188,10 @@ class Floorplan:
 
         hcg.connect_to_st()
         vcg.connect_to_st()
+        # modified BFS to find longest path
+        print(hcg.get_target_weight())
+        print(vcg.get_target_weight())
+        input()
 
 def parse_cmd_line(argv):
     '''Parse the argumets in command line.
