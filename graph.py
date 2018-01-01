@@ -10,9 +10,8 @@ class Dag:
         self.nodes = []
         self.name_to_nodes = {}
         self.source = Node(None)
-        self.terminal = Node(None)
+        self.target = Node(None)
         self._create_nodes(blocks)
-        # TODO: connect nodes
 
     def connect(self, from_idx, to_idx):
         '''Connect two nodes in both directions.
@@ -23,15 +22,15 @@ class Dag:
         to_node.add_in_node(from_node)
 
     def connect_to_st(self):
-        '''Connect those without in_nodes to source, those without out_nodes to terminal.
+        '''Connect those without in_nodes to source, those without out_nodes to target.
         '''
         for node in self.nodes:
             if not node.in_nodes:
                 self.source.add_out_node(node)
                 node.add_in_node(self.source)
             elif not node.out_nodes:
-                self.terminal.add_in_node(node)
-                node.add_out_node(self.terminal)
+                self.target.add_in_node(node)
+                node.add_out_node(self.target)
 
     def init_count(self):
         '''Initialize counts of nodes to their number of in-nodes.
@@ -62,11 +61,11 @@ class Dag:
                 try:
                     print('-> {}'.format(out_node.block.name))
                 except AttributeError:
-                    print('-> Terminal')
+                    print('-> Target')
         print('> Source')
         for out_node in self.source.out_nodes:
             print('-> {}'.format(out_node.block.name))
-        print('> Terminal')
+        print('> Target')
         for in_node in self.source.in_nodes:
             print('{} ->'.format(in_node.block.name))
 
