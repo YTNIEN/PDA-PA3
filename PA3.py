@@ -35,17 +35,17 @@ class Block:
     def get_width(self):
         '''Get width.
         '''
-        return self._width if not self.is_rotated else self._height
+        return self._width
 
     def get_height(self):
         '''Get height.
         '''
-        return self._height if not self.is_rotated else self._width
+        return self._height
 
     def rotate(self):
         '''Rotate this block.
         '''
-        self.is_rotated = True if not self.is_rotated else False
+        self._width, self._height = self._height, self._width
 
     def __repr__(self):
         return "Block(name='{0.name}', width={0._width}, height={0._height})".format(self)
@@ -68,9 +68,10 @@ class Floorplan:
     '''Floorplan consisting of copious blocks. Overlap among blocks is not allowed.
     The left-bottom corner is considered origin (0, 0), and no space is needed between two blocks.
     '''
-    def __init__(self):
+    def __init__(self, alpha):
         '''
         '''
+        self.alpha = alpha
         self.w_limit = -1
         self.h_limit = -1
         self.blocks = []
@@ -121,7 +122,6 @@ class Floorplan:
                         terminals = []
                         for _ in range(terminal_cnt):
                             term_name = f.readline().strip()
-                            print(term_name)
                             if term_name in self.name_to_block:
                                 terminals.append(self.name_to_block[term_name])
                             elif term_name in self.name_to_terminal:
@@ -157,7 +157,7 @@ def main(argv):
     '''
     print('PDA PA3 - Fixed Outline Floorplanning')
     args = parse_cmd_line(argv)
-    flpr = Floorplan()
+    flpr = Floorplan(argv.alpha)
     # parse block
     flpr.parse_block_file(args.block_file)
     # parse net
