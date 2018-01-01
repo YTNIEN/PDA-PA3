@@ -1,10 +1,10 @@
 '''2017PDA PA3 - Fixed Outline Floorplanning.
 
-Graph manimulation elements.
+Elements for graph manipulation.
 '''
 
-class Graph:
-    '''Graph.
+class Dag:
+    '''Directed Acyclic Graph (DAG).
     '''
     def __init__(self):
         self.nodes = []
