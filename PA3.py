@@ -6,13 +6,17 @@ Given a set of rectangular macros, or blocks, and a set of nets,
 a floorplaner places and packs all the macros into a bounding box without overlapping,
 optimizing total area overhead and net wirelength.
 '''
+# pylint: disable=R0902, R0903
 
 import sys
 import time
 import argparse
 # import tkinter as tk
-
 from collections import namedtuple
+from itertools import combinations
+
+import graph
+
 
 START_TIME = time.time()
 Terminal = namedtuple('Terminal', ['name', 'x', 'y'])
@@ -60,6 +64,7 @@ class Net:
 
     def calc_length(self):
         '''Calculate the half-perimeter wire length of this net.
+        Wire length is part of cost for a floorplan.
         '''
         #TODO: implement length estimation
         pass
@@ -79,6 +84,17 @@ class Floorplan:
         self.terminals = []
         self.name_to_terminal = {}
         self.nets = []
+        self.seq_pair = None
+
+    def place_block(self):
+        '''Do floorplanning via simulated-annealing.
+        '''
+        # initial sequence pair
+        #self.seq_pair = (list(range(len(self.blocks))), list(range(len(self.blocks))))
+        self.seq_pair = ([0,6,3,4,1,5,2,7], [7,3,6,1,4,2,5,0])
+        print(self.seq_pair)
+        # construct HCG, VCG
+        self._construct_cgraph()
 
     def parse_block_file(self, block_file):
         '''Parse input block file.
@@ -140,6 +156,39 @@ class Floorplan:
         except OSError as err:
             print(err, file=sys.stderr)
 
+    def _calc_cost(self):
+        '''Calculate cost in terms of area and wire length.
+        '''
+        # area: longest path
+        # wire length: HPWL of each net
+        pass
+
+    def _construct_cgraph(self):
+        '''Construct constraint graph, HCG and VCG.
+        '''
+        hcg = graph.Dag(self.blocks) # horizontal constraint graph
+        vcg = graph.Dag(self.blocks) # vertical constraint graph
+        for pair in combinations(self.seq_pair[0], 2):
+            # print(pair)
+            if self.seq_pair[1].index(pair[0]) < self.seq_pair[1].index(pair[1]):
+                # horizontal constraint
+                # print('Block "{}" is to the left of block "{}"'.format(self.blocks[pair[0]].name,
+                #                                                        self.blocks[pair[1]].name))
+                # print('HCG: {} -> {}'.format(*pair))
+                hcg.connect(pair[0], pair[1])
+            elif self.seq_pair[1].index(pair[0]) > self.seq_pair[1].index(pair[1]):
+                # vertical constraint
+                # print('Block "{}" is below block "{}"'.format(self.blocks[pair[1]].name,
+                #                                                        self.blocks[pair[0]].name))
+                # print('VCG: {} -> {}'.format(*pair))
+                vcg.connect(pair[1], pair[0])
+            else:
+                assert self.seq_pair[1].index(pair[0]) != self.seq_pair[1].index(pair[1]), (
+                'duplicate block index {} in sequence pair'.format(self.seq_pair[1].index(pair[0])))
+
+        hcg.connect_to_st()
+        vcg.connect_to_st()
+
 def parse_cmd_line(argv):
     '''Parse the argumets in command line.
     '''
@@ -157,12 +206,12 @@ def main(argv):
     '''
     print('PDA PA3 - Fixed Outline Floorplanning')
     args = parse_cmd_line(argv)
-    flpr = Floorplan(argv.alpha)
-    # parse block
+    flpr = Floorplan(args.alpha)
     flpr.parse_block_file(args.block_file)
-    # parse net
     flpr.parse_net_file(args.net_file)
-    # sequence pair
+    flpr.place_block()
+    # - sequence pair
+    # - HPWL
     # - longest path by modified BFS
 
 if __name__ == '__main__':
