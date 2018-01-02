@@ -126,7 +126,7 @@ class Floorplan:
             uphill = 0
             reject_cnt = 0
             while True:
-                move = randint(1, 1)
+                move = randint(0, 1)
                 # print('cur move: {}'.format(move))
                 if move == 0:
                     # Move1: swap 2 blocks in posive sequence only
@@ -314,7 +314,8 @@ class Floorplan:
             new_width, new_height = self._calc_area_cost()
             new_cost = new_width * new_height
             # if (wh_ratio * 0.95 < (new_width / new_height) < wh_ratio * 1.05):
-            if new_cost < 1.8 * bbox_area and new_cost < best_cost:
+            if new_cost < 2.0 * bbox_area and new_cost < best_cost:#and (
+                              #wh_ratio * 0.8 < (new_width / new_height) < wh_ratio * 1.2):
                 best_cost = new_cost
                 best_sol = copy.deepcopy(self.seq_pair)
                 print('Shuffle: {}x{}'.format(new_width, new_height))
