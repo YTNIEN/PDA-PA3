@@ -302,19 +302,23 @@ class Floorplan:
         '''Initialize sequence pair (self.seq_pair) by shuffling.
         '''
         self.seq_pair = (list(range(len(self.blocks))), list(range(len(self.blocks))))
+        best_sol = copy.deepcopy(self.seq_pair)
 
         width, height = self._calc_area_cost()
         best_cost = width * height
-        best_sol = copy.deepcopy(self.seq_pair)
-        for _ in range(10):
+        wh_ratio = self.w_limit / self.h_limit
+        bbox_area = self.w_limit * self.h_limit
+        for _ in range(10000):
             shuffle(self.seq_pair[0])
             shuffle(self.seq_pair[1])
             new_width, new_height = self._calc_area_cost()
-            if new_width <= self.w_limit and new_height <= self.h_limit:
+            new_cost = new_width * new_height
+            # if (wh_ratio * 0.95 < (new_width / new_height) < wh_ratio * 1.05):
+            if new_cost < 2 * bbox_area:
                 best_sol = copy.deepcopy(self.seq_pair)
                 print('Shuffle: {}x{}'.format(new_width, new_height))
             else:
-                self.seq_pair = best_sol
+                self.seq_pair = copy.deepcopy(best_sol)
 
 def parse_cmd_line(argv):
     '''Parse the argumets in command line.
