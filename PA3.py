@@ -106,7 +106,7 @@ class Floorplan:
 
         # TODO: tune annealing parameter
         best_sol = copy.deepcopy(self.seq_pair) # Best
-        temp = 120.0 # T
+        temp = 200.0 # T
         uphill_lim = 50 * len(self.blocks) # N
         cool_ratio = 0.98
 
@@ -314,7 +314,8 @@ class Floorplan:
             new_width, new_height = self._calc_area_cost()
             new_cost = new_width * new_height
             # if (wh_ratio * 0.95 < (new_width / new_height) < wh_ratio * 1.05):
-            if new_cost < 2 * bbox_area:
+            if new_cost < 1.8 * bbox_area and new_cost < best_cost:
+                best_cost = new_cost
                 best_sol = copy.deepcopy(self.seq_pair)
                 print('Shuffle: {}x{}'.format(new_width, new_height))
             else:
