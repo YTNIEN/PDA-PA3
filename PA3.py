@@ -65,11 +65,21 @@ class Net:
         self.terminals = terminals
 
     def calc_length(self):
-        '''Calculate the half-perimeter wire length of this net.
+        '''Calculate the half-perimeter wire length (HPWL) of this net.
         Wire length is part of cost for a floorplan.
         '''
-        #TODO: implement length estimation
-        pass
+        xx = []
+        yy = []
+        for terminal in self.terminals:
+            if isinstance(terminal, Block):
+                center_x = (terminal.left_x + terminal.right_x) // 2
+                center_y = (terminal.top_y + terminal.bottom_y) // 2
+                xx.append(center_x)
+                yy.append(center_y)
+            elif isinstance(terminal, Terminal):
+                xx.append(terminal.x)
+                yy.append(terminal.y)
+        return (max(xx) - min(xx)) + (max(yy) - min(yy))
 
 class Floorplan:
     '''Floorplan consisting of copious blocks. Overlap among blocks is not allowed.
@@ -90,11 +100,9 @@ class Floorplan:
         '''Do floorplanning via simulated-annealing.
         '''
         # initial solution
-        self.seq_pair = (list(range(len(self.blocks))), list(range(len(self.blocks))))
+        self._initialize_seq_pair()
         # self.seq_pair = ([0,6,3,4,1,5,2,7], [7,3,6,1,4,2,5,0])
         print(self.seq_pair)
-
-        self._randomize_seq_pair()
 
         # TODO: tune annealing parameter
         best_sol = copy.deepcopy(self.seq_pair) # Best
@@ -124,7 +132,8 @@ class Floorplan:
                     # Move1: swap 2 blocks in posive sequence only
                     idxes = sample(range(len(self.blocks)), 2) # index of block in list to swap
                     old_seq_pair = copy.deepcopy(self.seq_pair)
-                    (self.seq_pair[0][idxes[0]], self.seq_pair[0][idxes[1]]) = (self.seq_pair[0][idxes[1]], self.seq_pair[0][idxes[0]])
+                    (self.seq_pair[0][idxes[0]], self.seq_pair[0][idxes[1]]) = (
+                        self.seq_pair[0][idxes[1]], self.seq_pair[0][idxes[0]])
                 elif move == 1:
                     # Move2: swap 2 blocks in both positive and negative sequences
                     # print('before dual swap: {}'.format(self.seq_pair))
@@ -133,21 +142,23 @@ class Floorplan:
                     # print('swap {}'.format(blk_idxes))
                     idx0_in_p_seq = self.seq_pair[0].index(blk_idxes[0])
                     idx1_in_p_seq = self.seq_pair[0].index(blk_idxes[1])
-                    (self.seq_pair[0][idx0_in_p_seq], self.seq_pair[0][idx1_in_p_seq]) = (self.seq_pair[0][idx1_in_p_seq], self.seq_pair[0][idx0_in_p_seq])
+                    (self.seq_pair[0][idx0_in_p_seq], self.seq_pair[0][idx1_in_p_seq]) = (
+                        self.seq_pair[0][idx1_in_p_seq], self.seq_pair[0][idx0_in_p_seq])
                     idx0_in_n_seq = self.seq_pair[1].index(blk_idxes[0])
                     idx1_in_n_seq = self.seq_pair[1].index(blk_idxes[1])
-                    (self.seq_pair[1][idx0_in_n_seq], self.seq_pair[1][idx1_in_n_seq]) = (self.seq_pair[1][idx1_in_n_seq], self.seq_pair[1][idx0_in_n_seq])
+                    (self.seq_pair[1][idx0_in_n_seq], self.seq_pair[1][idx1_in_n_seq]) = (
+                        self.seq_pair[1][idx1_in_n_seq], self.seq_pair[1][idx0_in_n_seq])
                     # print('after dual swap: {}'.format(self.seq_pair))
                     # input()
                 else:
                     # Move3: rotate arbitrary block
-                    # FIXME: block rotation needs the configuration of rotation of each block
+                    # TODO: block rotation needs the configuration of rotation of each block
                     old_seq_pair = copy.deepcopy(self.seq_pair)
-                    pass
+
                 new_width, new_height = self._calc_area_cost()
                 new_wire_len = self._calc_wire_cost()
 
-                # TODO: modify cost function to consider whether new floorplan can fit into bounding box
+                # TODO: modify cost function to consider whether new floorplan can fit into outline
                 new_cost = self._calc_cost(new_width * new_height, new_wire_len)
                 delta_cost = new_cost - cost
                 move_cnt += 1
@@ -179,6 +190,7 @@ class Floorplan:
         self.seq_pair = best_sol
         print('Best cost: {:,}'.format(best_cost))
         print('Area: {}x{}'.format(*self._calc_area_cost()))
+        print('Target: {}x{}'.format(self.w_limit, self.h_limit))
 
     def parse_block_file(self, block_file):
         '''Parse input block file.
@@ -248,9 +260,10 @@ class Floorplan:
     def _calc_wire_cost(self):
         '''Calculate cost in terms of area and wire length.
         '''
-        # wire length: HPWL of each net
-        # TODO: add wire cost implementation
-        return 0
+        hpwl = 0
+        for net in self.nets:
+            hpwl += net.calc_length()
+        return hpwl
 
     def _calc_area_cost(self):
         '''Construct constraint graph, HCG and VCG based on sequence pair and return width and
@@ -274,7 +287,8 @@ class Floorplan:
                 vcg.connect(pair[1], pair[0])
             else:
                 assert self.seq_pair[1].index(pair[0]) != self.seq_pair[1].index(pair[1]), (
-                    'duplicate block index {} in sequence pair'.format(self.seq_pair[1].index(pair[0])))
+                    'duplicate block index {} in sequence pair'.format(
+                        self.seq_pair[1].index(pair[0])))
 
         hcg.connect_to_st()
         vcg.connect_to_st()
@@ -284,16 +298,23 @@ class Floorplan:
         height = vcg.get_target_weight()
         return weight, height
 
-    def _randomize_seq_pair(self):
-        '''Shuffle sequence pair (self.seq_pair).
+    def _initialize_seq_pair(self):
+        '''Initialize sequence pair (self.seq_pair) by shuffling.
         '''
+        self.seq_pair = (list(range(len(self.blocks))), list(range(len(self.blocks))))
+
         width, height = self._calc_area_cost()
-        shuffle(self.seq_pair[0])
-        shuffle(self.seq_pair[1])
-        new_width, new_height = self._calc_area_cost()
-        if new_width <= self.w_limit and new_height <= self.h_limit:
-            print('Shuffle: {}x{}'.format(new_width, new_height))
-            input()
+        best_cost = width * height
+        best_sol = copy.deepcopy(self.seq_pair)
+        for _ in range(10):
+            shuffle(self.seq_pair[0])
+            shuffle(self.seq_pair[1])
+            new_width, new_height = self._calc_area_cost()
+            if new_width <= self.w_limit and new_height <= self.h_limit:
+                best_sol = copy.deepcopy(self.seq_pair)
+                print('Shuffle: {}x{}'.format(new_width, new_height))
+            else:
+                self.seq_pair = best_sol
 
 def parse_cmd_line(argv):
     '''Parse the argumets in command line.
