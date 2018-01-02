@@ -116,17 +116,26 @@ class Floorplan:
             uphill = 0
             reject_cnt = 0
             while True:
-                move = randint(0, 0)
+                move = randint(1, 1)
                 # print('cur move: {}'.format(move))
                 if move == 0:
                     # Move1: swap 2 blocks in posive sequence only
-                    idxes = sample(range(len(self.blocks)), 2)
-                    # print(idxes)
+                    idxes = sample(range(len(self.blocks)), 2) # index of block in list to swap
                     old_seq_pair = copy.deepcopy(self.seq_pair)
                     (self.seq_pair[0][idxes[0]], self.seq_pair[0][idxes[1]]) = (self.seq_pair[0][idxes[1]], self.seq_pair[0][idxes[0]])
                 elif move == 1:
                     # Move2: swap 2 blocks in both positive and negative sequences
-                    pass
+                    # print('before dual swap: {}'.format(self.seq_pair))
+                    blk_idxes = sample(range(len(self.blocks)), 2)
+                    # print('swap {}'.format(blk_idxes))
+                    idx0_in_p_seq = self.seq_pair[0].index(blk_idxes[0])
+                    idx1_in_p_seq = self.seq_pair[0].index(blk_idxes[1])
+                    (self.seq_pair[0][idx0_in_p_seq], self.seq_pair[0][idx1_in_p_seq]) = (self.seq_pair[0][idx1_in_p_seq], self.seq_pair[0][idx0_in_p_seq])
+                    idx0_in_n_seq = self.seq_pair[1].index(blk_idxes[0])
+                    idx1_in_n_seq = self.seq_pair[1].index(blk_idxes[1])
+                    (self.seq_pair[1][idx0_in_n_seq], self.seq_pair[1][idx1_in_n_seq]) = (self.seq_pair[1][idx1_in_n_seq], self.seq_pair[1][idx0_in_n_seq])
+                    # print('after dual swap: {}'.format(self.seq_pair))
+                    # input()
                 else:
                     # Move3: rotate arbitrary block
                     # FIXME: block rotation needs the configuration of rotation of each block
@@ -134,6 +143,7 @@ class Floorplan:
                 new_width, new_height = self._calc_area_cost()
                 new_wire_len = self._calc_wire_cost()
 
+                # TODO: modify cost function to consider whether new floorplan can fit into bounding box
                 new_cost = self._calc_cost(new_width * new_height, new_wire_len)
                 delta_cost = new_cost - cost
                 move_cnt += 1
