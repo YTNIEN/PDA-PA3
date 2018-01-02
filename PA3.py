@@ -15,7 +15,7 @@ import sys
 import time
 from collections import namedtuple
 from itertools import combinations
-from random import randint, random, sample
+from random import randint, random, sample, shuffle
 
 import graph
 
@@ -94,6 +94,8 @@ class Floorplan:
         # self.seq_pair = ([0,6,3,4,1,5,2,7], [7,3,6,1,4,2,5,0])
         print(self.seq_pair)
 
+        self._randomize_seq_pair()
+
         # TODO: tune annealing parameter
         best_sol = copy.deepcopy(self.seq_pair) # Best
         temp = 120.0 # T
@@ -126,6 +128,7 @@ class Floorplan:
                 elif move == 1:
                     # Move2: swap 2 blocks in both positive and negative sequences
                     # print('before dual swap: {}'.format(self.seq_pair))
+                    old_seq_pair = copy.deepcopy(self.seq_pair)
                     blk_idxes = sample(range(len(self.blocks)), 2)
                     # print('swap {}'.format(blk_idxes))
                     idx0_in_p_seq = self.seq_pair[0].index(blk_idxes[0])
@@ -139,6 +142,7 @@ class Floorplan:
                 else:
                     # Move3: rotate arbitrary block
                     # FIXME: block rotation needs the configuration of rotation of each block
+                    old_seq_pair = copy.deepcopy(self.seq_pair)
                     pass
                 new_width, new_height = self._calc_area_cost()
                 new_wire_len = self._calc_wire_cost()
@@ -181,7 +185,7 @@ class Floorplan:
         '''
         try:
             with open(block_file, 'rt') as f:
-                self.w_limit, self.h_limit = f.readline().split()[1:]
+                self.w_limit, self.h_limit = [int(str_) for str_ in f.readline().split()[1:]]
                 nblock = int(f.readline().split()[1])
                 nterminal = int(f.readline().split()[1])
                 for line in f:
@@ -270,7 +274,7 @@ class Floorplan:
                 vcg.connect(pair[1], pair[0])
             else:
                 assert self.seq_pair[1].index(pair[0]) != self.seq_pair[1].index(pair[1]), (
-                'duplicate block index {} in sequence pair'.format(self.seq_pair[1].index(pair[0])))
+                    'duplicate block index {} in sequence pair'.format(self.seq_pair[1].index(pair[0])))
 
         hcg.connect_to_st()
         vcg.connect_to_st()
@@ -279,6 +283,17 @@ class Floorplan:
         weight = hcg.get_target_weight()
         height = vcg.get_target_weight()
         return weight, height
+
+    def _randomize_seq_pair(self):
+        '''Shuffle sequence pair (self.seq_pair).
+        '''
+        width, height = self._calc_area_cost()
+        shuffle(self.seq_pair[0])
+        shuffle(self.seq_pair[1])
+        new_width, new_height = self._calc_area_cost()
+        if new_width <= self.w_limit and new_height <= self.h_limit:
+            print('Shuffle: {}x{}'.format(new_width, new_height))
+            input()
 
 def parse_cmd_line(argv):
     '''Parse the argumets in command line.
