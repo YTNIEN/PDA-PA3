@@ -76,8 +76,6 @@ class Floorplan:
     The left-bottom corner is considered origin (0, 0), and no space is needed between two blocks.
     '''
     def __init__(self, alpha):
-        '''
-        '''
         self.alpha = alpha
         self.w_limit = -1
         self.h_limit = -1
@@ -98,19 +96,19 @@ class Floorplan:
 
         # TODO: tune annealing parameter
         best_sol = copy.deepcopy(self.seq_pair) # Best
-        temp = 1000.0 # T
+        temp = 120.0 # T
+        uphill_lim = 50 * len(self.blocks) # N
+        cool_ratio = 0.98
+
         move_cnt = 0 # MT
         uphill = 0 # uphill
-        uphill_lim = 200 * len(self.blocks) # N
         reject_cnt = 0 # reject
-        cool_ratio = 0.95
 
         width, height = self._calc_area_cost()
         wire_len = self._calc_wire_cost()
         cost = self._calc_cost(width*height, wire_len)
         best_cost = cost
         print('Init cost: {:,}'.format(cost))
-        input()
 
         # while reject ratio in previous round was not so high and time is not up
         while True:
@@ -121,14 +119,16 @@ class Floorplan:
                 move = randint(0, 0)
                 # print('cur move: {}'.format(move))
                 if move == 0:
-                    # swap posive sequence only
+                    # Move1: swap 2 blocks in posive sequence only
                     idxes = sample(range(len(self.blocks)), 2)
                     # print(idxes)
                     old_seq_pair = copy.deepcopy(self.seq_pair)
                     (self.seq_pair[0][idxes[0]], self.seq_pair[0][idxes[1]]) = (self.seq_pair[0][idxes[1]], self.seq_pair[0][idxes[0]])
                 elif move == 1:
+                    # Move2: swap 2 blocks in both positive and negative sequences
                     pass
                 else:
+                    # Move3: rotate arbitrary block
                     # FIXME: block rotation needs the configuration of rotation of each block
                     pass
                 new_width, new_height = self._calc_area_cost()
@@ -155,13 +155,16 @@ class Floorplan:
                     break
             temp = cool_ratio * temp
             # FIXME: add termination condition in terms of T
-            if (reject_cnt/move_cnt) > 0.95 or (time.time() - START_TIME) >= 50.0:
-                if reject_cnt/move_cnt > 0.95:
+            # TODO: add finer control of exit at running out of time
+            if (reject_cnt/move_cnt) > 0.99 or (time.time() - START_TIME) >= 50.0:
+                if reject_cnt/move_cnt > 0.99:
                     print('SA ends due to tons of rejection', flush=True)
                 else:
                     print('SA ends at time-up', flush=True)
                 break
+        self.seq_pair = best_sol
         print('Best cost: {:,}'.format(best_cost))
+        print('Area: {}x{}'.format(*self._calc_area_cost()))
 
     def parse_block_file(self, block_file):
         '''Parse input block file.
@@ -294,3 +297,4 @@ def main(argv):
 
 if __name__ == '__main__':
     main(sys.argv[1:])
+    print('Elapsed time: {:.3f} secs'.format(time.time()-START_TIME))
