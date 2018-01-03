@@ -20,6 +20,7 @@ from random import randint, random, sample, shuffle
 import graph
 
 START_TIME = time.time()
+ABRT_TIME = START_TIME + 260.0
 Terminal = namedtuple('Terminal', ['name', 'x', 'y'])
 
 class Block:
@@ -175,12 +176,12 @@ class Floorplan:
                     # restore sequence pair
                     self.seq_pair = copy.deepcopy(old_seq_pair)
                     reject_cnt += 1
-                if uphill > uphill_lim or move_cnt > 2*uphill_lim:
+                if (uphill > uphill_lim) or (move_cnt > 2*uphill_lim) or (time.time() >= ABRT_TIME):
                     break
             temp = cool_ratio * temp
             # FIXME: add termination condition in terms of T
             # TODO: add finer control of exit at running out of time
-            if (reject_cnt/move_cnt) > 0.99 or (time.time() - START_TIME) >= 250.0:
+            if (reject_cnt/move_cnt) > 0.99 or (time.time() >= ABRT_TIME):
                 if reject_cnt/move_cnt > 0.99:
                     print('SA ends due to tons of rejection', flush=True)
                 else:
@@ -339,21 +340,17 @@ class Floorplan:
 
         width, height = self._calc_area()
         best_area = width * height
-        wh_ratio = self.w_limit / self.h_limit
         bbox_area = self.w_limit * self.h_limit
-        for _ in range(10000):
+        for _ in range(50000):
             shuffle(self.seq_pair[0])
             shuffle(self.seq_pair[1])
             new_width, new_height = self._calc_area()
             new_area = new_width * new_height
-            # if (wh_ratio * 0.95 < (new_width / new_height) < wh_ratio * 1.05):
-            if new_area < 3.5 * bbox_area and new_area < best_area:#and (
-                              #wh_ratio * 0.8 < (new_width / new_height) < wh_ratio * 1.2):
+            if new_area < 3.5 * bbox_area and new_area < best_area:
                 best_area = new_area
                 best_sol = copy.deepcopy(self.seq_pair)
                 print('Shuffle: {}x{}={:,}'.format(new_width, new_height, new_width*new_height))
             else:
-                # XXX: check why it works only with deepcopy
                 self.seq_pair = copy.deepcopy(best_sol)
 
 def parse_cmd_line(argv):
