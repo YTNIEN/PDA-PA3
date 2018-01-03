@@ -114,8 +114,8 @@ class Floorplan:
         uphill = 0 # uphill
         reject_cnt = 0 # reject
 
-        width, height = self._calc_area_cost()
-        wire_len = self._calc_wire_cost()
+        width, height = self._calc_area()
+        wire_len = self._calc_wire_len()
         cost = self._calc_cost(width*height, wire_len)
         best_cost = cost
         print('Init cost: {:,}'.format(cost))
@@ -155,8 +155,8 @@ class Floorplan:
                     # TODO: block rotation needs the configuration of rotation of each block
                     old_seq_pair = copy.deepcopy(self.seq_pair)
 
-                new_width, new_height = self._calc_area_cost()
-                new_wire_len = self._calc_wire_cost()
+                new_width, new_height = self._calc_area()
+                new_wire_len = self._calc_wire_len()
 
                 # TODO: modify cost function to consider whether new floorplan can fit into outline
                 new_cost = self._calc_cost(new_width * new_height, new_wire_len)
@@ -188,9 +188,10 @@ class Floorplan:
                     print('SA ends at time-up', flush=True)
                 break
         self.seq_pair = best_sol
+        width, height = self._calc_area()
         print('Best cost: {:,}'.format(best_cost))
-        print('Area: {}x{}'.format(*self._calc_area_cost()))
-        print('Target: {}x{}'.format(self.w_limit, self.h_limit))
+        print('Area: {}x{}={:,}'.format(width, height, width*height))
+        print('Target: {}x{}={:,}'.format(self.w_limit, self.h_limit, self.w_limit*self.h_limit))
 
     def parse_block_file(self, block_file):
         '''Parse input block file.
@@ -255,15 +256,15 @@ class Floorplan:
     def calc_cost(self):
         '''Calculate cost.
         '''
-        width, height = self._calc_area_cost()
-        hpwl = self._calc_wire_cost()
+        width, height = self._calc_area()
+        hpwl = self._calc_wire_len()
         return self._calc_cost(width*height, hpwl)
 
     def print_rpt(self, file_name='output.rpt'):
         '''Print floorplan result to file.
         '''
-        width, height = self._calc_area_cost()
-        hpwl = self._calc_wire_cost()
+        width, height = self._calc_area()
+        hpwl = self._calc_wire_len()
         cost = self._calc_cost(width*height, hpwl)
         with open(file_name, 'wt') as ofile:
             print(cost, file=ofile)
@@ -280,7 +281,7 @@ class Floorplan:
         '''
         return self.alpha * area + (1 - self.alpha) * wire_len
 
-    def _calc_wire_cost(self):
+    def _calc_wire_len(self):
         '''Calculate cost in terms of area and wire length.
         '''
         hpwl = 0
@@ -288,7 +289,7 @@ class Floorplan:
             hpwl += net.calc_length()
         return hpwl
 
-    def _calc_area_cost(self):
+    def _calc_area(self):
         '''Construct constraint graph, HCG and VCG based on sequence pair and return width and
         height of floorplan.
         '''
@@ -327,21 +328,21 @@ class Floorplan:
         self.seq_pair = (list(range(len(self.blocks))), list(range(len(self.blocks))))
         best_sol = copy.deepcopy(self.seq_pair)
 
-        width, height = self._calc_area_cost()
-        best_cost = width * height
+        width, height = self._calc_area()
+        best_area = width * height
         wh_ratio = self.w_limit / self.h_limit
         bbox_area = self.w_limit * self.h_limit
         for _ in range(10000):
             shuffle(self.seq_pair[0])
             shuffle(self.seq_pair[1])
-            new_width, new_height = self._calc_area_cost()
-            new_cost = new_width * new_height
+            new_width, new_height = self._calc_area()
+            new_area = new_width * new_height
             # if (wh_ratio * 0.95 < (new_width / new_height) < wh_ratio * 1.05):
-            if new_cost < 2.5 * bbox_area and new_cost < best_cost:#and (
+            if new_area < 3.5 * bbox_area and new_area < best_area:#and (
                               #wh_ratio * 0.8 < (new_width / new_height) < wh_ratio * 1.2):
-                best_cost = new_cost
+                best_area = new_area
                 best_sol = copy.deepcopy(self.seq_pair)
-                print('Shuffle: {}x{}'.format(new_width, new_height))
+                print('Shuffle: {}x{}={:,}'.format(new_width, new_height, new_width*new_height))
             else:
                 self.seq_pair = copy.deepcopy(best_sol)
 
@@ -349,7 +350,7 @@ def parse_cmd_line(argv):
     '''Parse the argumets in command line.
     '''
     parser = argparse.ArgumentParser(description='PDA PA3 - Fixed Outline Floorplanning')
-    parser.add_argument('alpha', metavar='<alpha α>', type=float,
+    parser.add_argument('alpha', metavar='<alpha>', type=float,
                         help=('User defined ratio to balance chip area and wire length'))
     parser.add_argument('block_file', metavar='<input_block>', help='Input.block name')
     parser.add_argument('net_file', metavar='<input_net>', help='Input.net name')
