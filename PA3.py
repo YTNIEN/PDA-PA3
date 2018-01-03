@@ -173,14 +173,14 @@ class Floorplan:
                         best_cost = new_cost
                 else:
                     # restore sequence pair
-                    self.seq_pair = old_seq_pair
+                    self.seq_pair = copy.deepcopy(old_seq_pair)
                     reject_cnt += 1
                 if uphill > uphill_lim or move_cnt > 2*uphill_lim:
                     break
             temp = cool_ratio * temp
             # FIXME: add termination condition in terms of T
             # TODO: add finer control of exit at running out of time
-            if (reject_cnt/move_cnt) > 0.99 or (time.time() - START_TIME) >= 50.0:
+            if (reject_cnt/move_cnt) > 0.99 or (time.time() - START_TIME) >= 250.0:
                 if reject_cnt/move_cnt > 0.99:
                     print('SA ends due to tons of rejection', flush=True)
                 else:
@@ -313,7 +313,6 @@ class Floorplan:
                 assert self.seq_pair[1].index(pair[0]) != self.seq_pair[1].index(pair[1]), (
                     'duplicate block index {} in sequence pair'.format(
                         self.seq_pair[1].index(pair[0])))
-
         hcg.connect_to_st()
         vcg.connect_to_st()
         weight = hcg.get_target_weight()
@@ -325,13 +324,15 @@ class Floorplan:
         bounding box into consideration.
         '''
         width, height = self._calc_area()
+        # if current area is already smaller both in width and height
+        if width < self.w_limit and height < self.h_limit:
+            return width*height
         width = self.h_limit if width < self.w_limit else width
         height = self.w_limit if height < self.h_limit else height
         return width*height
 
-
     def _initialize_seq_pair(self):
-        '''Initialize sequence pair (self.seq_pair) by shuffling.
+        '''Initialize sequence pair (self.seq_pair) by shuffling it.
         '''
         self.seq_pair = (list(range(len(self.blocks))), list(range(len(self.blocks))))
         best_sol = copy.deepcopy(self.seq_pair)
