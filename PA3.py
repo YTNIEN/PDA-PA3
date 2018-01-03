@@ -326,7 +326,7 @@ class Floorplan:
         width, height = self._calc_area()
         # if current area is already smaller both in width and height
         if width < self.w_limit and height < self.h_limit:
-            return width*height
+            return 0
         width = self.h_limit if width < self.w_limit else width
         height = self.w_limit if height < self.h_limit else height
         return width*height
