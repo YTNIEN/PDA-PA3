@@ -9,3 +9,6 @@ __pycache__/
 *.block
 *.nets
 *.rpt
+*.log
+testcase_block
+testcase_nets

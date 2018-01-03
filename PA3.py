@@ -252,6 +252,29 @@ class Floorplan:
         except OSError as err:
             sys.exit(err)
 
+    def calc_cost(self):
+        '''Calculate cost.
+        '''
+        width, height = self._calc_area_cost()
+        hpwl = self._calc_wire_cost()
+        return self._calc_cost(width*height, hpwl)
+
+    def print_rpt(self, file_name='output.rpt'):
+        '''Print floorplan result to file.
+        '''
+        width, height = self._calc_area_cost()
+        hpwl = self._calc_wire_cost()
+        cost = self._calc_cost(width*height, hpwl)
+        with open(file_name, 'wt') as ofile:
+            print(cost, file=ofile)
+            print(hpwl, file=ofile)
+            print(width*height, file=ofile)
+            print('{} {}'.format(width, height), file=ofile)
+            print('{:.0f}'.format(time.time()-START_TIME), file=ofile)
+            for block in self.blocks:
+                print('{0.name} {0.left_x} {0.bottom_y} {0.right_x} {0.top_y}'.format(block),
+                      file=ofile)
+
     def _calc_cost(self, area, wire_len):
         '''Calculate final cost considering both area and wire length.
         '''
@@ -314,7 +337,7 @@ class Floorplan:
             new_width, new_height = self._calc_area_cost()
             new_cost = new_width * new_height
             # if (wh_ratio * 0.95 < (new_width / new_height) < wh_ratio * 1.05):
-            if new_cost < 2.0 * bbox_area and new_cost < best_cost:#and (
+            if new_cost < 2.5 * bbox_area and new_cost < best_cost:#and (
                               #wh_ratio * 0.8 < (new_width / new_height) < wh_ratio * 1.2):
                 best_cost = new_cost
                 best_sol = copy.deepcopy(self.seq_pair)
@@ -343,9 +366,7 @@ def main(argv):
     flpr.parse_block_file(args.block_file)
     flpr.parse_net_file(args.net_file)
     flpr.place_block()
-    # - sequence pair
-    # - HPWL
-    # - longest path by modified BFS
+    flpr.print_rpt(args.output_file)
 
 if __name__ == '__main__':
     main(sys.argv[1:])
