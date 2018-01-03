@@ -116,7 +116,7 @@ class Floorplan:
 
         width, height = self._calc_area()
         wire_len = self._calc_wire_len()
-        cost = self._calc_cost(width*height, wire_len)
+        cost = self._calc_cost(self._calc_area_cost(), wire_len)
         best_cost = cost
         print('Init cost: {:,}'.format(cost))
 
@@ -159,7 +159,7 @@ class Floorplan:
                 new_wire_len = self._calc_wire_len()
 
                 # TODO: modify cost function to consider whether new floorplan can fit into outline
-                new_cost = self._calc_cost(new_width * new_height, new_wire_len)
+                new_cost = self._calc_cost(self._calc_area_cost(), new_wire_len)
                 delta_cost = new_cost - cost
                 move_cnt += 1
 
@@ -175,7 +175,6 @@ class Floorplan:
                     # restore sequence pair
                     self.seq_pair = old_seq_pair
                     reject_cnt += 1
-
                 if uphill > uphill_lim or move_cnt > 2*uphill_lim:
                     break
             temp = cool_ratio * temp
@@ -254,7 +253,7 @@ class Floorplan:
             sys.exit(err)
 
     def calc_cost(self):
-        '''Calculate cost.
+        '''Calculate cost considering both area and hpwl.
         '''
         width, height = self._calc_area()
         hpwl = self._calc_wire_len()
@@ -290,8 +289,9 @@ class Floorplan:
         return hpwl
 
     def _calc_area(self):
-        '''Construct constraint graph, HCG and VCG based on sequence pair and return width and
-        height of floorplan.
+        '''Construct constraint graph, HCG and VCG based on sequence pair to find out the size of
+        floorplan.
+        Return (width, height).
         '''
         hcg = graph.Hcg(self.blocks) # horizontal constraint graph
         vcg = graph.Vcg(self.blocks) # vertical constraint graph
@@ -316,11 +316,19 @@ class Floorplan:
 
         hcg.connect_to_st()
         vcg.connect_to_st()
-        # modified BFS to find longest path
-        # the accumulated weight at target in VCG and HCG is the size of floorplan
         weight = hcg.get_target_weight()
         height = vcg.get_target_weight()
         return weight, height
+
+    def _calc_area_cost(self):
+        '''Calculate area cost and take whether current floorplan from self.seq_pair can fit into
+        bounding box into consideration.
+        '''
+        width, height = self._calc_area()
+        width = self.h_limit if width < self.w_limit else width
+        height = self.w_limit if height < self.h_limit else height
+        return width*height
+
 
     def _initialize_seq_pair(self):
         '''Initialize sequence pair (self.seq_pair) by shuffling.
@@ -344,6 +352,7 @@ class Floorplan:
                 best_sol = copy.deepcopy(self.seq_pair)
                 print('Shuffle: {}x{}={:,}'.format(new_width, new_height, new_width*new_height))
             else:
+                # XXX: check why it works only with deepcopy
                 self.seq_pair = copy.deepcopy(best_sol)
 
 def parse_cmd_line(argv):
