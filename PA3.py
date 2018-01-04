@@ -105,7 +105,7 @@ class Floorplan:
         # initial solution
         self._initialize_seq_pair()
         # self.seq_pair = ([0,6,3,4,1,5,2,7], [7,3,6,1,4,2,5,0])
-        print(self.seq_pair)
+        # print(self.seq_pair)
 
         best_sol = copy.deepcopy(self.seq_pair) # Best
         temp = 200.0 # T
@@ -160,12 +160,13 @@ class Floorplan:
                 delta_cost = new_cost - cost
                 move_cnt += 1
 
-                if delta_cost < 0.0 or random() < math.exp(-1*delta_cost/temp):
+                if (delta_cost < 0.0 or random() < math.exp(-1*delta_cost/temp) or
+                        self._is_valid(new_width, new_height)):
                     # print('Delta cost: {}'.format(delta_cost), flush=True)
                     cost = new_cost
                     if delta_cost > 0:
                         uphill += 1
-                    if new_cost < best_cost:
+                    if new_cost < best_cost or self._is_valid(new_width, new_height):
                         best_sol = copy.deepcopy(self.seq_pair)
                         best_cost = new_cost
                 else:
@@ -314,6 +315,11 @@ class Floorplan:
         weight = hcg.get_target_weight()
         height = vcg.get_target_weight()
         return weight, height
+
+    def _is_valid(self, width, height):
+        '''Return True is current floorplan can fit into bounding box.
+        '''
+        return width <= self.w_limit and height < self.h_limit
 
     def _calc_area_cost(self):
         '''Calculate area cost and take whether current floorplan from self.seq_pair can fit into
