@@ -20,7 +20,9 @@ from random import randint, random, sample, shuffle
 import graph
 
 START_TIME = time.time()
-ABRT_TIME = START_TIME + 260.0
+ABRT_TIME = START_TIME + 295.0
+SHUFFLE_LIMIT = 50000
+SHUFFLE_ABRT_TIME = START_TIME + 150.0
 Terminal = namedtuple('Terminal', ['name', 'x', 'y'])
 
 class Block:
@@ -105,7 +107,6 @@ class Floorplan:
         # self.seq_pair = ([0,6,3,4,1,5,2,7], [7,3,6,1,4,2,5,0])
         print(self.seq_pair)
 
-        # TODO: tune annealing parameter
         best_sol = copy.deepcopy(self.seq_pair) # Best
         temp = 200.0 # T
         uphill_lim = 50 * len(self.blocks) # N
@@ -137,10 +138,8 @@ class Floorplan:
                         self.seq_pair[0][idxes[1]], self.seq_pair[0][idxes[0]])
                 elif move == 1:
                     # Move2: swap 2 blocks in both positive and negative sequences
-                    # print('before dual swap: {}'.format(self.seq_pair))
                     old_seq_pair = copy.deepcopy(self.seq_pair)
                     blk_idxes = sample(range(len(self.blocks)), 2)
-                    # print('swap {}'.format(blk_idxes))
                     idx0_in_p_seq = self.seq_pair[0].index(blk_idxes[0])
                     idx1_in_p_seq = self.seq_pair[0].index(blk_idxes[1])
                     (self.seq_pair[0][idx0_in_p_seq], self.seq_pair[0][idx1_in_p_seq]) = (
@@ -149,8 +148,6 @@ class Floorplan:
                     idx1_in_n_seq = self.seq_pair[1].index(blk_idxes[1])
                     (self.seq_pair[1][idx0_in_n_seq], self.seq_pair[1][idx1_in_n_seq]) = (
                         self.seq_pair[1][idx1_in_n_seq], self.seq_pair[1][idx0_in_n_seq])
-                    # print('after dual swap: {}'.format(self.seq_pair))
-                    # input()
                 else:
                     # Move3: rotate arbitrary block
                     # TODO: block rotation needs the configuration of rotation of each block
@@ -179,11 +176,12 @@ class Floorplan:
                     break
             temp = cool_ratio * temp
             if (reject_cnt/move_cnt) > 0.99 or (time.time() >= ABRT_TIME):
-                if reject_cnt/move_cnt > 0.99:
-                    print('SA ends due to tons of rejection', flush=True)
-                else:
+                if time.time() >= ABRT_TIME:
                     print('SA ends at time-up', flush=True)
+                else:
+                    print('SA ends due to heavy rejection', flush=True)
                 break
+
         self.seq_pair = best_sol
         width, height = self._calc_area()
         print('Best cost: {:,}'.format(best_cost))
@@ -338,7 +336,7 @@ class Floorplan:
         width, height = self._calc_area()
         best_area = width * height
         bbox_area = self.w_limit * self.h_limit
-        for _ in range(50000):
+        for _ in range(SHUFFLE_LIMIT):
             shuffle(self.seq_pair[0])
             shuffle(self.seq_pair[1])
             new_width, new_height = self._calc_area()
@@ -349,6 +347,9 @@ class Floorplan:
                 print('Shuffle: {}x{}={:,}'.format(new_width, new_height, new_width*new_height))
             else:
                 self.seq_pair = copy.deepcopy(best_sol)
+            if time.time() >= SHUFFLE_ABRT_TIME:
+                print('Shuffle terminated due to limit on time')
+                break
 
 def parse_cmd_line(argv):
     '''Parse the argumets in command line.
