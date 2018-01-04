@@ -43,18 +43,19 @@ class Block:
     def get_width(self):
         '''Get width.
         '''
-        return self._width
+        return self._width if not self.is_rotated else self._height
 
     def get_height(self):
         '''Get height.
         '''
-        return self._height
+        return self._height if not self.is_rotated else self._width
 
-    def rotate(self):
+    def set_rotate(self, rotate):
         '''Rotate this block.
         '''
-        self.is_rotated = True if not self.is_rotated else False
-        self._width, self._height = self._height, self._width
+        if not isinstance(rotate, bool):
+            raise TypeError('rotate is not a bool')
+        self.is_rotated = rotate
 
     def __repr__(self):
         return "Block(name='{0.name}', width={0._width}, height={0._height})".format(self)
@@ -382,4 +383,4 @@ def main(argv):
 
 if __name__ == '__main__':
     main(sys.argv[1:])
-    print('Elapsed time: {:.3f} secs'.format(time.time()-START_TIME))
+    print('Elapsed time: {:.3f} secs\a'.format(time.time()-START_TIME))
