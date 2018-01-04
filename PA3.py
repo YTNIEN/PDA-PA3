@@ -170,7 +170,7 @@ class Floorplan:
                         best_cost = new_cost
                 else:
                     # restore sequence pair
-                    self.seq_pair = copy.deepcopy(old_seq_pair)
+                    self.seq_pair = old_seq_pair
                     reject_cnt += 1
                 if (uphill > uphill_lim) or (move_cnt > 2*uphill_lim) or (time.time() >= ABRT_TIME):
                     break
