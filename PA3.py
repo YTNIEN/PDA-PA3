@@ -159,7 +159,6 @@ class Floorplan:
                 new_width, new_height = self._calc_area()
                 new_wire_len = self._calc_wire_len()
 
-                # TODO: modify cost function to consider whether new floorplan can fit into outline
                 new_cost = self._calc_cost(self._calc_area_cost(), new_wire_len)
                 delta_cost = new_cost - cost
                 move_cnt += 1
@@ -179,8 +178,6 @@ class Floorplan:
                 if (uphill > uphill_lim) or (move_cnt > 2*uphill_lim) or (time.time() >= ABRT_TIME):
                     break
             temp = cool_ratio * temp
-            # FIXME: add termination condition in terms of T
-            # TODO: add finer control of exit at running out of time
             if (reject_cnt/move_cnt) > 0.99 or (time.time() >= ABRT_TIME):
                 if reject_cnt/move_cnt > 0.99:
                     print('SA ends due to tons of rejection', flush=True)
