@@ -15,7 +15,7 @@ import sys
 import time
 from collections import namedtuple
 from itertools import combinations
-from random import randint, random, sample, shuffle
+from random import randint, random, sample, shuffle, randrange
 
 import graph
 
@@ -99,6 +99,7 @@ class Floorplan:
         self.name_to_terminal = {}
         self.nets = []
         self.seq_pair = None
+        self.rotate_lst = None
 
     def place_block(self):
         '''Do floorplanning via simulated-annealing.
@@ -109,6 +110,8 @@ class Floorplan:
         # print(self.seq_pair)
 
         best_sol = copy.deepcopy(self.seq_pair) # Best
+        best_rotate = copy.copy(self.rotate_lst)
+
         temp = 200.0 # T
         uphill_lim = 50 * len(self.blocks) # N
         cool_ratio = 0.98
@@ -131,15 +134,15 @@ class Floorplan:
             while True:
                 move = randint(0, 1)
                 # print('cur move: {}'.format(move))
+                old_seq_pair = copy.deepcopy(self.seq_pair)
+                old_rotate = copy.copy(self.rotate_lst)
                 if move == 0:
                     # Move1: swap 2 blocks in posive sequence only
                     idxes = sample(range(len(self.blocks)), 2) # index of block in list to swap
-                    old_seq_pair = copy.deepcopy(self.seq_pair)
                     (self.seq_pair[0][idxes[0]], self.seq_pair[0][idxes[1]]) = (
                         self.seq_pair[0][idxes[1]], self.seq_pair[0][idxes[0]])
                 elif move == 1:
                     # Move2: swap 2 blocks in both positive and negative sequences
-                    old_seq_pair = copy.deepcopy(self.seq_pair)
                     blk_idxes = sample(range(len(self.blocks)), 2)
                     idx0_in_p_seq = self.seq_pair[0].index(blk_idxes[0])
                     idx1_in_p_seq = self.seq_pair[0].index(blk_idxes[1])
@@ -150,9 +153,9 @@ class Floorplan:
                     (self.seq_pair[1][idx0_in_n_seq], self.seq_pair[1][idx1_in_n_seq]) = (
                         self.seq_pair[1][idx1_in_n_seq], self.seq_pair[1][idx0_in_n_seq])
                 else:
-                    # Move3: rotate arbitrary block
-                    # TODO: block rotation needs the configuration of rotation of each block
-                    old_seq_pair = copy.deepcopy(self.seq_pair)
+                    # Move3: rotate an arbitrary block
+                    idx = randrange(0, len(self.rotate_lst))
+                    self.rotate_lst[idx] = True if not self.rotate_lst[idx] else False
 
                 new_width, new_height = self._calc_area()
                 new_wire_len = self._calc_wire_len()
@@ -169,10 +172,12 @@ class Floorplan:
                         uphill += 1
                     if new_cost < best_cost or self._is_valid(new_width, new_height):
                         best_sol = copy.deepcopy(self.seq_pair)
+                        best_rotate = copy.copy(self.rotate_lst)
                         best_cost = new_cost
                 else:
                     # restore sequence pair
                     self.seq_pair = old_seq_pair
+                    self.rotate_lst = old_rotate
                     reject_cnt += 1
                 if (uphill > uphill_lim) or (move_cnt > 2*uphill_lim) or (time.time() >= ABRT_TIME):
                     break
@@ -185,6 +190,7 @@ class Floorplan:
                 break
 
         self.seq_pair = best_sol
+        self.rotate_lst = best_rotate
         width, height = self._calc_area()
         print('Best cost: {:,}'.format(best_cost))
         print('Area: {}x{}={:,}'.format(width, height, width*height))
@@ -214,6 +220,7 @@ class Floorplan:
                 assert len(self.terminals) == nterminal, 'Wrong terminal number'
         except OSError as err:
             sys.exit(err)
+        self.rotate_lst = [False for _ in range(len(self.blocks))]
 
     def parse_net_file(self, net_file):
         '''Parse input net files.
@@ -286,11 +293,20 @@ class Floorplan:
             hpwl += net.calc_length()
         return hpwl
 
+    def _set_block_rotation(self):
+        '''Set rotation of each block based on self.rotate_lst
+        '''
+        for block, rotate in zip(self.blocks, self.rotate_lst):
+            block.set_rotate(rotate)
+
     def _calc_area(self):
         '''Construct constraint graph, HCG and VCG based on sequence pair to find out the size of
         floorplan.
         Return (width, height).
         '''
+        # set rotation config of each block
+        self._set_block_rotation()
+
         hcg = graph.Hcg(self.blocks) # horizontal constraint graph
         vcg = graph.Vcg(self.blocks) # vertical constraint graph
         for pair in combinations(self.seq_pair[0], 2):
@@ -327,7 +343,7 @@ class Floorplan:
         bounding box into consideration.
         '''
         width, height = self._calc_area()
-        # if current area is already smaller both in width and height
+        # if current area is already valid
         if width < self.w_limit and height < self.h_limit:
             return 0
         width = self.h_limit if width < self.w_limit else width
