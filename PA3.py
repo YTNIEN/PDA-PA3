@@ -21,8 +21,8 @@ import graph
 
 START_TIME = time.time()
 ABRT_TIME = START_TIME + 295.0
-SHUFFLE_LIMIT = 50000
-SHUFFLE_ABRT_TIME = START_TIME + 150.0
+SHUFFLE_LIMIT = 1000
+SHUFFLE_ABRT_TIME = START_TIME + 50.0
 Terminal = namedtuple('Terminal', ['name', 'x', 'y'])
 
 class Block:
@@ -100,6 +100,7 @@ class Floorplan:
         self.nets = []
         self.seq_pair = None
         self.rotate_lst = None
+        self.is_valid = False
 
     def place_block(self):
         '''Do floorplanning via simulated-annealing.
@@ -132,8 +133,7 @@ class Floorplan:
             uphill = 0
             reject_cnt = 0
             while True:
-                move = randint(0, 1)
-                # print('cur move: {}'.format(move))
+                move = randint(0, 2)
                 old_seq_pair = copy.deepcopy(self.seq_pair)
                 old_rotate = copy.copy(self.rotate_lst)
                 if move == 0:
@@ -158,27 +158,46 @@ class Floorplan:
                     self.rotate_lst[idx] = True if not self.rotate_lst[idx] else False
 
                 new_width, new_height = self._calc_area()
+                if self._is_valid(new_width, new_height):
+                    print('Got valid floorplan', flush=True)
+                    self.is_valid = True
                 new_wire_len = self._calc_wire_len()
 
                 new_cost = self._calc_cost(self._calc_area_cost(), new_wire_len)
                 delta_cost = new_cost - cost
                 move_cnt += 1
 
-                if (delta_cost < 0.0 or random() < math.exp(-1*delta_cost/temp) or
-                        self._is_valid(new_width, new_height)):
-                    # print('Delta cost: {}'.format(delta_cost), flush=True)
-                    cost = new_cost
-                    if delta_cost > 0:
-                        uphill += 1
-                    if new_cost < best_cost or self._is_valid(new_width, new_height):
-                        best_sol = copy.deepcopy(self.seq_pair)
-                        best_rotate = copy.copy(self.rotate_lst)
-                        best_cost = new_cost
+                if not self.is_valid:
+                    if (delta_cost < 0.0 or
+                            random() < math.exp(-5*delta_cost/temp)):
+                        # print('Delta cost: {}'.format(delta_cost), flush=True)
+                        cost = new_cost
+                        print('Accept sol {}x{} with cost: {}'.format(new_width, new_height, new_cost))
+                        if delta_cost > 0:
+                            uphill += 1
+                        if new_cost < best_cost:
+                            best_sol = copy.deepcopy(self.seq_pair)
+                            best_rotate = copy.copy(self.rotate_lst)
+                            best_cost = new_cost
+                    else:
+                        # restore sequence pair
+                        self.seq_pair = old_seq_pair
+                        self.rotate_lst = old_rotate
+                        reject_cnt += 1
                 else:
-                    # restore sequence pair
-                    self.seq_pair = old_seq_pair
-                    self.rotate_lst = old_rotate
-                    reject_cnt += 1
+                    if (delta_cost < 0.0 and
+                            self._is_valid(new_width, new_height)):
+                        cost = new_cost
+                        if new_cost < best_cost:
+                            best_sol = copy.deepcopy(self.seq_pair)
+                            best_rotate = copy.copy(self.rotate_lst)
+                            best_cost = new_cost
+                    else:
+                        # restore sequence pair
+                        self.seq_pair = old_seq_pair
+                        self.rotate_lst = old_rotate
+                        reject_cnt += 1
+
                 if (uphill > uphill_lim) or (move_cnt > 2*uphill_lim) or (time.time() >= ABRT_TIME):
                     break
             temp = cool_ratio * temp
@@ -283,7 +302,27 @@ class Floorplan:
     def _calc_cost(self, area, wire_len):
         '''Calculate final cost considering both area and wire length.
         '''
-        return self.alpha * area + (1 - self.alpha) * wire_len
+        # if current floorplan is valid, return cost = alpha * area + (1-alpha) * hpwl
+        if self.is_valid:
+            return self.alpha * area + (1 - self.alpha) * wire_len
+        else:
+            return area
+
+    def _calc_area_cost(self):
+        '''Calculate area cost and take whether current floorplan from self.seq_pair can fit into
+        bounding box into consideration.
+        '''
+        width, height = self._calc_area()
+        # # if current area is already valid
+        # if width < self.w_limit and height < self.h_limit:
+        #     return 0
+        # width = self.h_limit if width < self.w_limit else width
+        # height = self.w_limit if height < self.h_limit else height
+        # return width*height
+        if self.is_valid:
+            return width * height
+        else:
+            return max(width - self.w_limit, 0) + max(height - self.h_limit, 0)
 
     def _calc_wire_len(self):
         '''Calculate cost in terms of area and wire length.
@@ -334,21 +373,9 @@ class Floorplan:
         return weight, height
 
     def _is_valid(self, width, height):
-        '''Return True is current floorplan can fit into bounding box.
+        '''Return True if current floorplan can fit into bounding box, False otherwise.
         '''
         return width <= self.w_limit and height < self.h_limit
-
-    def _calc_area_cost(self):
-        '''Calculate area cost and take whether current floorplan from self.seq_pair can fit into
-        bounding box into consideration.
-        '''
-        width, height = self._calc_area()
-        # if current area is already valid
-        if width < self.w_limit and height < self.h_limit:
-            return 0
-        width = self.h_limit if width < self.w_limit else width
-        height = self.w_limit if height < self.h_limit else height
-        return width*height
 
     def _initialize_seq_pair(self):
         '''Initialize sequence pair (self.seq_pair) by shuffling it.
@@ -359,13 +386,17 @@ class Floorplan:
         width, height = self._calc_area()
         best_area = width * height
         bbox_area = self.w_limit * self.h_limit
+        best_cost = self._calc_area_cost()
         for _ in range(SHUFFLE_LIMIT):
             shuffle(self.seq_pair[0])
             shuffle(self.seq_pair[1])
             new_width, new_height = self._calc_area()
             new_area = new_width * new_height
-            if new_area < 3.5 * bbox_area and new_area < best_area:
+            new_cost = self._calc_area_cost()
+            # if new_area < 3.5 * bbox_area and new_area < best_area:
+            if new_cost < best_cost:
                 best_area = new_area
+                best_cost = new_cost
                 best_sol = copy.deepcopy(self.seq_pair)
                 print('Shuffle: {}x{}={:,}'.format(new_width, new_height, new_width*new_height))
             else:
