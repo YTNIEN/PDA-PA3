@@ -133,7 +133,7 @@ class Floorplan:
             uphill = 0
             reject_cnt = 0
             while True:
-                move = randint(0, 1)
+                move = randint(0, 2)
                 old_seq_pair = copy.deepcopy(self.seq_pair)
                 old_rotate = copy.copy(self.rotate_lst)
                 if move == 0:
@@ -159,7 +159,7 @@ class Floorplan:
 
                 new_width, new_height = self._calc_area()
                 if self._is_valid(new_width, new_height) and not self.is_valid:
-                    print('Got valid floorplan', flush=True)
+                    print('Got valid floorplan: {}x{}'.format(new_width, new_height), flush=True)
                     self.is_valid = True
                 new_wire_len = self._calc_wire_len()
 
@@ -208,6 +208,7 @@ class Floorplan:
                     print('SA ends due to heavy rejection', flush=True)
                 break
 
+        self.is_valid = True # for correct cost evaluation
         self.seq_pair = best_sol
         self.rotate_lst = best_rotate
         width, height = self._calc_area()
