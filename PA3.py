@@ -133,7 +133,7 @@ class Floorplan:
             uphill = 0
             reject_cnt = 0
             while True:
-                move = randint(0, 2)
+                move = randint(0, 1)
                 old_seq_pair = copy.deepcopy(self.seq_pair)
                 old_rotate = copy.copy(self.rotate_lst)
                 if move == 0:
@@ -158,7 +158,7 @@ class Floorplan:
                     self.rotate_lst[idx] = True if not self.rotate_lst[idx] else False
 
                 new_width, new_height = self._calc_area()
-                if self._is_valid(new_width, new_height):
+                if self._is_valid(new_width, new_height) and not self.is_valid:
                     print('Got valid floorplan', flush=True)
                     self.is_valid = True
                 new_wire_len = self._calc_wire_len()
@@ -169,10 +169,10 @@ class Floorplan:
 
                 if not self.is_valid:
                     if (delta_cost < 0.0 or
-                            random() < math.exp(-5*delta_cost/temp)):
+                            random() < math.exp(-1*delta_cost/temp)):
                         # print('Delta cost: {}'.format(delta_cost), flush=True)
                         cost = new_cost
-                        print('Accept sol {}x{} with cost: {}'.format(new_width, new_height, new_cost))
+                        # print('Accept sol {}x{} with cost: {}'.format(new_width, new_height, new_cost))
                         if delta_cost > 0:
                             uphill += 1
                         if new_cost < best_cost:
@@ -316,13 +316,13 @@ class Floorplan:
         # # if current area is already valid
         # if width < self.w_limit and height < self.h_limit:
         #     return 0
-        # width = self.h_limit if width < self.w_limit else width
-        # height = self.w_limit if height < self.h_limit else height
         # return width*height
         if self.is_valid:
             return width * height
         else:
-            return max(width - self.w_limit, 0) + max(height - self.h_limit, 0)
+            width = self.h_limit if width < self.w_limit else width
+            height = self.w_limit if height < self.h_limit else height
+            return width * height
 
     def _calc_wire_len(self):
         '''Calculate cost in terms of area and wire length.
